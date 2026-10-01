@@ -109,7 +109,21 @@ and waits.
 - **Drag** — it dangles from the cursor; dropped near the taskbar it bounces,
   anywhere else it floats down on a little parachute.
 - **Right-click** — feed it (cookie, coffee, spicy food), ask for a high five,
-  send it to nap or wake it, pick the mode and the reminders, or hide it.
+  play a mini-game, send it to nap or wake it, pick the mode and the reminders,
+  or hide it.
+- **The cursor outside its window** — Clawd notices it coming closer (within
+  about 220 px), waves goodbye when it leaves after a while (at most once a
+  minute), and gets dizzy if you circle it twice within 8 seconds.
+
+### Mini-games
+
+Right-click → Main. They run inside the pet's own window; tricks and reminders
+wait until the game is over, and the results are remembered.
+
+- **Suit** — rock-paper-scissors against Clawd, first to two round wins.
+- **Tebak tangan** — guess which hand holds the gift.
+- **Tepuk serangga** — squash as many bugs as you can in 15 seconds; Clawd
+  keeps your record.
 
 Speech bubbles and small particle effects (hearts, stars, confetti, dust, fire)
 go with the reactions. Clawd remembers the tricks it played recently (so it
@@ -143,7 +157,7 @@ animations in the same style, animated with CSS keyframes:
 |------|-----------|
 | Reminders | `drink` (glass of water), `stretch`, `eye-rest` (covers its eyes, looks at a faraway tree) |
 | Claude Code | `bell` (Claude finished), `raise-hand` (needs your permission), `wait-clock` (quiet for 2 minutes), `stamp` (tests passed) |
-| You | `eat` (cookie), `fire` (spicy food), `dizzy` (five quick clicks), `parachute` (dropped) |
+| You | `eat` (cookie), `fire` (spicy food), `dizzy` (five quick clicks or circling it), `parachute` (dropped), `wave` (cursor leaves) |
 | Laptop | `antenna` (offline) |
 | Idle tricks | `yoyo`, `bubbles`, `fishing` (catches a shoe), `dumbbell` (the weights are balloons), `dance` |
 | Jahil pranks | `folder` (disguised as a folder), `hide-sign` ("AKU NGGAK ADA"), `potato` |

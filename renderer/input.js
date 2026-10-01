@@ -16,6 +16,14 @@
     const PET_WINDOW = 1500;       // ... within this many ms count as petting
     const PET_COOLDOWN = 4000;
     const HOVER_COOLDOWN = 30000;
+    // The cursor outside the window (main.js sends its offset from Clawd's body):
+    const NEAR = 220;              // px: closer than this, Clawd notices it
+    const GONE = 450;              // px: back beyond this after a while near: wave goodbye
+    const STAYED = 1500;           // ms near before leaving counts as a goodbye
+    const WAVE_COOLDOWN = 60000;
+    const CIRCLE_RING = [60, 450]; // px: circling only counts in this ring
+    const CIRCLE_TURNS = 2;        // this many turns around Clawd ...
+    const CIRCLE_WINDOW = 8000;    // ... within this many ms tire it out
 
     let press = null;       // screen position where the left button went down
     let held = false;       // the window is being dragged
@@ -28,6 +36,61 @@
     let swings = [];
     let lastPetAt = 0;
     let lastHoverAt = 0;
+    let cursorNear = false;
+    let nearSince = 0;
+    let lastWaveAt = 0;
+    let lastAngle = null;
+    let turns = [];         // { t, d }: angle steps (radians) of the cursor around Clawd
+
+    // A mini-game owns the mouse while it runs (its buttons handle their own clicks).
+    const playing = () => window.games && window.games.active();
+
+    function noticeHover(now) {
+        if (now - lastHoverAt <= HOVER_COOLDOWN) return;
+        lastHoverAt = now;
+        window.clawd.hover();
+    }
+
+    function trackCircling(dx, dy, now) {
+        const dist = Math.hypot(dx, dy);
+        if (dist < CIRCLE_RING[0] || dist > CIRCLE_RING[1]) {
+            lastAngle = null;
+            return;
+        }
+        const angle = Math.atan2(dy, dx);
+        if (lastAngle !== null) {
+            let d = angle - lastAngle;
+            if (d > Math.PI) d -= 2 * Math.PI;
+            if (d < -Math.PI) d += 2 * Math.PI;
+            turns.push({ t: now, d });
+        }
+        lastAngle = angle;
+        turns = turns.filter((s) => now - s.t < CIRCLE_WINDOW);
+        const total = Math.abs(turns.reduce((sum, s) => sum + s.d, 0)) / (2 * Math.PI);
+        if (total >= CIRCLE_TURNS) {
+            turns = [];
+            lastAngle = null;
+            window.clawd.chased();
+        }
+    }
+
+    api.onCursor(({ dx, dy }) => {
+        if (press || playing()) return;
+        const now = Date.now();
+        const dist = Math.hypot(dx, dy);
+        if (dist <= NEAR && !cursorNear) {
+            cursorNear = true;
+            nearSince = now;
+            noticeHover(now);
+        } else if (dist >= GONE && cursorNear) {
+            cursorNear = false;
+            if (now - nearSince >= STAYED && now - lastWaveAt > WAVE_COOLDOWN) {
+                lastWaveAt = now;
+                window.clawd.wave();
+            }
+        }
+        trackCircling(dx, dy, now);
+    });
 
     // Ends a press; resolves true when it was a drag (so not a click).
     async function release() {
@@ -79,7 +142,7 @@
     }
 
     root.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 || playing()) return;
         press = { x: e.screenX, y: e.screenY };
         root.setPointerCapture(e.pointerId);
     });
@@ -93,7 +156,7 @@
             window.clawd.dragStart();
             return;
         }
-        if (!press && e.buttons === 0) trackPetting(e);
+        if (!press && e.buttons === 0 && !playing()) trackPetting(e);
     });
 
     root.addEventListener('pointerup', async (e) => {
@@ -109,11 +172,7 @@
         lastX = null;
         lastDir = 0;
         swings = [];
-        const now = Date.now();
-        if (!press && now - lastHoverAt > HOVER_COOLDOWN) {
-            lastHoverAt = now;
-            window.clawd.hover();
-        }
+        if (!press && !playing()) noticeHover(Date.now());
     });
 
     window.addEventListener('contextmenu', (e) => {

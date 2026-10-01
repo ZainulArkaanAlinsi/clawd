@@ -122,6 +122,77 @@ body.held {
     overflow: hidden;
 }
 
+/* --- renderer/games.js ---------------------------------------------------- */
+
+#game {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+#game button {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    padding: 0;
+    pointer-events: auto;
+    cursor: pointer;
+    font: clamp(14px, 11vw, 28px)/1 "Segoe UI Emoji", "Segoe UI", sans-serif;
+}
+
+#game .choice {
+    width: 22%;
+    aspect-ratio: 1;
+    border: 2px solid #2b2118;
+    border-radius: 50%;
+    background: #fffaf2;
+    box-shadow: 0 2px 0 #2b2118;
+    transition: transform 0.1s;
+}
+
+#game .choice:hover {
+    transform: translate(-50%, -56%) scale(1.08);
+}
+
+#game .bug {
+    border: none;
+    background: transparent;
+    animation: bug-in 0.15s ease-out;
+}
+
+#game .bug.hit {
+    cursor: default;
+    animation: bug-hit 0.3s ease-out forwards;
+}
+
+@keyframes bug-in {
+    from { transform: translate(-50%, -50%) scale(0); }
+    to { transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes bug-hit {
+    to { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+}
+
+#game .banner {
+    position: absolute;
+    left: 50%;
+    top: 46%;
+    transform: translate(-50%, -50%);
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: rgba(43, 33, 24, 0.85);
+    color: #fff;
+    font: 700 clamp(12px, 10vw, 26px)/1.2 "Segoe UI Emoji", "Segoe UI", sans-serif;
+    white-space: nowrap;
+}
+
+#game .prize {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font: clamp(14px, 12vw, 30px)/1 "Segoe UI Emoji", sans-serif;
+    animation: bug-in 0.3s ease-out;
+}
+
 #pet-img.wobble {
     animation: wobble 0.6s ease-in-out infinite;
 }
