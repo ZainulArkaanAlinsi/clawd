@@ -14,8 +14,6 @@ function getGifDuration(filePath) {
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  moveWindow: (pos) => ipcRenderer.send('move-window', pos),
-  getScreenSize: () => ipcRenderer.invoke('get-screen-size'),
   getGifs: () => {
     try {
       const gifDir = path.join(__dirname, 'assets', 'gif');
@@ -28,5 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     } catch {
       return [];
     }
-  }
+  },
+  onClaudeEvent: (callback) => ipcRenderer.on('claude-event', (_event, ev) => callback(ev)),
+  reportStatus: (status) => ipcRenderer.send('pet-status', status),
 });

@@ -1,36 +1,36 @@
 const rawGifs = window.electronAPI.getGifs();
 
+// "clawd-idle-reading.gif" -> state "idle-reading"
 const STATES = {};
 const DURATIONS = {};
 rawGifs.forEach(({ name, duration }) => {
-    const key = name.replace('.gif', '');
+    const key = name.replace('.gif', '').replace(/^clawd-/, '');
     STATES[key] = `../assets/gif/${name}`;
     DURATIONS[key] = duration;
 });
 
-const container = document.getElementById('pet-container');
 const petImg = document.getElementById('pet-img');
 
 let currentState = '';
-let recentStates = [];
+let playCount = 0;
 
-function pickRandom() {
-    const all = Object.keys(STATES);
-    if (all.length === 0) return null;
-    const keys = all.filter(k => !recentStates.includes(k));
-    const pool = keys.length > 0 ? keys : all;
-    return pool[Math.floor(Math.random() * pool.length)];
-}
+window.pet = {
+    has: (state) => state in STATES,
+    duration: (state) => DURATIONS[state] || 1000,
+    current: () => currentState,
 
-window.playOnce = function(onDone) {
-    const state = pickRandom();
-    if (!state) { onDone(); return; }
-    recentStates = [...recentStates.slice(-3), state];
+    // Loop a state. Asking for the state already shown is a no-op, so the GIF
+    // keeps running instead of restarting.
+    loop(state) {
+        if (!STATES[state] || state === currentState) return;
+        currentState = state;
+        petImg.src = STATES[state];
+    },
 
-    if (currentState) container.classList.remove(currentState);
-    container.classList.add(state);
-    petImg.src = STATES[state];
-    currentState = state;
-
-    setTimeout(onDone, DURATIONS[state]);
+    // Play a state from its first frame (the query string forces a restart).
+    once(state) {
+        if (!STATES[state]) return;
+        currentState = state;
+        petImg.src = `${STATES[state]}?play=${++playCount}`;
+    },
 };

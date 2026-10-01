@@ -58,6 +58,44 @@ npm install
 npm start
 ```
 
+## Claude Code Integration
+
+Clawd stays on screen and reacts to Claude Code activity through local
+[hooks](https://code.claude.com/docs/en/hooks). The app listens on
+`127.0.0.1:47321` (override with `CLAWD_PORT`); `hooks/clawd-hook.js` forwards
+only the event name, tool name and a coarse shell-command kind — never prompts,
+file contents or command text.
+
+1. Copy `hooks/clawd-hook.js` somewhere stable, e.g. `~/.claude/hooks/`.
+2. Add a command hook for each event in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"C:/Users/<you>/.claude/hooks/clawd-hook.js\"", "async": true, "timeout": 5 }] }]
+  }
+}
+```
+
+Useful events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
+`PostToolUseFailure`, `PermissionRequest`, `Notification`, `SubagentStart`,
+`PreCompact`, `Stop`, `StopFailure`, `SessionEnd`.
+
+When Claude is quiet, Clawd follows the clock: naps after midnight, takes a lunch
+break at noon, reads in the evening and chimes on the hour.
+
+### Command-line control
+
+`scripts/clawd.cmd` (put it on your `PATH`) controls the installed app:
+
+```
+clawd [show]          start Clawd or bring it back
+clawd hide            hide Clawd (stays in the tray)
+clawd quit            close Clawd
+clawd status          what Clawd is doing (JSON)
+clawd startup on|off  start with Windows
+```
+
 ## Build Installer
 
 ```bash
