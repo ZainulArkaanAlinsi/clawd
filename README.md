@@ -106,7 +106,8 @@ and waits.
   **Five quick clicks** — it gets dizzy and wobbles.
 - **Pet it** — move the cursor back and forth over it: hearts.
 - **Hover** — it looks at you (at most every 30 seconds).
-- **Drag** — it dangles from the cursor; dropped near the taskbar it bounces.
+- **Drag** — it dangles from the cursor; dropped near the taskbar it bounces,
+  anywhere else it floats down on a little parachute.
 - **Right-click** — feed it (cookie, coffee, spicy food), ask for a high five,
   send it to nap or wake it, pick the mode and the reminders, or hide it.
 
@@ -132,6 +133,22 @@ stretch (90) while you are at the laptop; being away for 5 minutes counts as an
 eye and stretch break. A reminder stays up for 3 minutes with nothing else
 moving over it. Click Clawd to mark it done, or right-click → snooze 10 minutes.
 Each reminder can be turned off under Reminders / Pengingat.
+
+### Animations drawn for this fork
+
+`assets/svg/clawd-act-*.svg` (state name without `clawd-act-`) are new pixel-art
+animations in the same style, animated with CSS keyframes:
+
+| When | Animation |
+|------|-----------|
+| Reminders | `drink` (glass of water), `stretch`, `eye-rest` (covers its eyes, looks at a faraway tree) |
+| Claude Code | `bell` (Claude finished), `raise-hand` (needs your permission), `wait-clock` (quiet for 2 minutes), `stamp` (tests passed) |
+| You | `eat` (cookie), `fire` (spicy food), `dizzy` (five quick clicks), `parachute` (dropped) |
+| Laptop | `antenna` (offline) |
+| Idle tricks | `yoyo`, `bubbles`, `fishing` (catches a shoe), `dumbbell` (the weights are balloons), `dance` |
+| Jahil pranks | `folder` (disguised as a folder), `hide-sign` ("AKU NGGAK ADA"), `potato` |
+
+If one of these files is missing, Clawd falls back to the older animation.
 
 ### Command-line control
 
