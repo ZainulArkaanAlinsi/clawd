@@ -13,13 +13,28 @@ const SYSTEM_SAMPLE_EVERY = 10000;
 // Claude Code hooks (hooks/clawd-hook.js) POST activity events here.
 const EVENT_PORT = Number(process.env.CLAWD_PORT) || 47321;
 const SWITCHES = ['--show', '--hide', '--quit', '--startup-on', '--startup-off', '--launch-on', '--launch-off'];
+const DRAG_FRAME = 16;           // ms between window moves while dragging
+const DRAG_MAX = 60 * 1000;      // stop following the cursor if the mouse-up never arrives
+const NEAR_TASKBAR = 80;         // px: a drop this close to the bottom bounces
+
+// How lively the pets are (renderer/behavior.js MODES) and the break reminders.
+const MODES = [['kalem', 'Kalem'], ['teman', 'Teman kerja'], ['jahil', 'Jahil'], ['fokus', 'Fokus']];
+const REMINDERS = [['water', 'Minum air'], ['stretch', 'Peregangan'], ['eyes', 'Istirahat mata']];
 
 // pets[0] is the home pet: always present, even with no Claude Code session.
 // Every further Claude Code session gets its own pet next to it.
 const pets = [];
 let tray;
 let hiddenByUser = false;
-let config = { autoStart: true, launchWithClaude: true, size: 'medium', x: null, y: null };
+let config = {
+  autoStart: true,
+  launchWithClaude: true,
+  size: 'medium',
+  x: null,
+  y: null,
+  mode: 'teman',
+  reminders: { water: true, stretch: true, eyes: true },
+};
 let saveTimer = null;
 
 app.commandLine.appendSwitch('disable-background-timer-throttling');
@@ -112,6 +127,49 @@ function ensureOnScreen() {
   });
 }
 
+// --- dragging (renderer/input.js asks; the window then follows the cursor) ---------
+
+function startDrag(pet) {
+  stopDrag(pet);
+  const cursor = screen.getCursorScreenPoint();
+  const [x, y] = pet.win.getPosition();
+  const offset = { x: cursor.x - x, y: cursor.y - y };
+  const startedAt = Date.now();
+  pet.drag = setInterval(() => {
+    if (pet.win.isDestroyed() || Date.now() - startedAt > DRAG_MAX) {
+      stopDrag(pet);
+      return;
+    }
+    const p = screen.getCursorScreenPoint();
+    placePet(pet, { x: p.x - offset.x, y: p.y - offset.y });
+  }, DRAG_FRAME);
+}
+
+function stopDrag(pet) {
+  if (!pet.drag) return false;
+  clearInterval(pet.drag);
+  pet.drag = null;
+  return true;
+}
+
+// Ends a drag: keep the pet inside the work area of the screen it was dropped on,
+// remember where the home pet now lives, and tell the renderer how it landed.
+function dropPet(pet) {
+  if (!stopDrag(pet) || pet.win.isDestroyed()) return { moved: false };
+  const size = petSize();
+  const [x, y] = pet.win.getPosition();
+  const area = screen.getDisplayNearestPoint({ x: x + size / 2, y: y + size / 2 }).workArea;
+  const nx = Math.min(Math.max(x, area.x), area.x + area.width - size);
+  const ny = Math.min(Math.max(y, area.y), area.y + area.height - size);
+  placePet(pet, { x: nx, y: ny });
+  if (pet === pets[0]) {
+    config.x = nx;
+    config.y = ny;
+    saveConfigSoon();
+  }
+  return { moved: true, nearBottom: ny + size >= area.y + area.height - NEAR_TASKBAR };
+}
+
 // --- pets ----------------------------------------------------------------------
 
 // `claude` tells the renderer whether this pet follows a Claude Code session
@@ -154,7 +212,7 @@ function createPet(session = null) {
       backgroundThrottling: false,
     },
   });
-  const pet = { win, session, pid: null, project: '', status: { state: 'idle', label: 'santai' }, ready: false, queue: [] };
+  const pet = { win, session, pid: null, project: '', status: { state: 'idle', label: 'santai' }, ready: false, queue: [], drag: null };
   pets.push(pet);
 
   win.setAlwaysOnTop(true, 'screen-saver');
@@ -168,22 +226,13 @@ function createPet(session = null) {
     if (!hiddenByUser) win.showInactive();
   });
 
-  if (index === 0) {
-    // The home pet is draggable (CSS app-region); remember where the user put it.
-    win.on('moved', () => {
-      const [x, y] = win.getPosition();
-      config.x = x;
-      config.y = y;
-      saveConfigSoon();
-    });
-  }
-
   // Keep the pet alive if its renderer ever crashes.
   win.webContents.on('render-process-gone', () => {
     if (!win.isDestroyed()) win.reload();
   });
 
   win.on('closed', () => {
+    stopDrag(pet);
     const i = pets.indexOf(pet);
     if (i !== -1) pets.splice(i, 1);
     broadcastMeta();
@@ -361,6 +410,83 @@ function setSize(value) {
   if (tray) buildTrayMenu();
 }
 
+// What the renderers need to know: the mode and which reminders are on.
+function petSettings() {
+  const [mode, modeLabel] = MODES.find(([value]) => value === config.mode) || MODES[1];
+  const on = config.reminders || {};
+  return { mode, modeLabel, reminders: Object.fromEntries(REMINDERS.map(([key]) => [key, on[key] !== false])) };
+}
+
+function broadcastSettings() {
+  for (const pet of pets) {
+    if (!pet.win.isDestroyed()) pet.win.webContents.send('pet-settings', petSettings());
+  }
+}
+
+function setMode(value) {
+  if (!MODES.some(([v]) => v === value)) return;
+  config.mode = value;
+  writeConfigNow();
+  broadcastSettings();
+  if (tray) buildTrayMenu();
+}
+
+function setReminder(key, on) {
+  config.reminders = { ...config.reminders, [key]: on };
+  writeConfigNow();
+  broadcastSettings();
+  if (tray) buildTrayMenu();
+}
+
+const modeMenu = () => MODES.map(([value, label]) => ({
+  label,
+  type: 'radio',
+  checked: petSettings().mode === value,
+  click: () => setMode(value),
+}));
+
+const reminderMenu = () => REMINDERS.map(([key, label]) => ({
+  label,
+  type: 'checkbox',
+  checked: petSettings().reminders[key],
+  click: (item) => setReminder(key, item.checked),
+}));
+
+// Right-click on a pet. Actions go back to that pet's renderer (behavior.js onAction).
+function showPetMenu(pet, context) {
+  const act = (action) => () => {
+    if (!pet.win.isDestroyed()) pet.win.webContents.send('pet-action', action);
+  };
+  const items = [];
+  if (context.reminder) {
+    items.push(
+      { label: 'Udah, makasih', click: act({ type: 'reminder-done' }) },
+      { label: 'Tunda 10 menit', click: act({ type: 'reminder-snooze' }) },
+      { type: 'separator' },
+    );
+  }
+  items.push(
+    {
+      label: 'Kasih makan',
+      submenu: [
+        { label: 'Kue', click: act({ type: 'feed', item: 'cookie' }) },
+        { label: 'Kopi', click: act({ type: 'feed', item: 'coffee' }) },
+        { label: 'Makanan pedas', click: act({ type: 'feed', item: 'spicy' }) },
+      ],
+    },
+    { label: 'Ajak tos', click: act({ type: 'high-five' }) },
+    context.napping
+      ? { label: 'Bangunin', click: act({ type: 'wake' }) }
+      : { label: 'Suruh istirahat', click: act({ type: 'nap' }) },
+    { type: 'separator' },
+    { label: 'Mode', submenu: modeMenu() },
+    { label: 'Pengingat', submenu: reminderMenu() },
+    { type: 'separator' },
+    { label: 'Sembunyikan', click: hidePets },
+  );
+  Menu.buildFromTemplate(items).popup({ window: pet.win });
+}
+
 function buildTrayMenu() {
   const sizeItem = (label, value) => ({
     label,
@@ -373,6 +499,8 @@ function buildTrayMenu() {
     { label: 'Hide', click: hidePets },
     { type: 'separator' },
     { label: 'Size', submenu: [sizeItem('Small', 'small'), sizeItem('Medium', 'medium'), sizeItem('Large', 'large')] },
+    { label: 'Mode', submenu: modeMenu() },
+    { label: 'Reminders', submenu: reminderMenu() },
     {
       label: 'Show when Claude Code starts',
       type: 'checkbox',
@@ -479,6 +607,23 @@ ipcMain.on('pet-status', (event, s) => {
   if (!pet) return;
   pet.status = { state: shortString(s && s.state), label: shortString(s && s.label) };
   updateTrayTooltip();
+});
+
+ipcMain.handle('get-settings', () => petSettings());
+
+ipcMain.on('show-menu', (event, context) => {
+  const pet = petFor(event.sender);
+  if (pet) showPetMenu(pet, { reminder: Boolean(context && context.reminder), napping: Boolean(context && context.napping) });
+});
+
+ipcMain.on('drag-start', (event) => {
+  const pet = petFor(event.sender);
+  if (pet) startDrag(pet);
+});
+
+ipcMain.handle('drag-end', (event) => {
+  const pet = petFor(event.sender);
+  return pet ? dropPet(pet) : { moved: false };
 });
 
 // --- command-line control (clawd.cmd: ClaudePet.exe --hide, --size=large, ...) ----
