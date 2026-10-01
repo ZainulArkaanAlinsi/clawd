@@ -39,14 +39,23 @@ const MODES = {
 };
 
 // Idle tricks. `say` adds a speech bubble; the jahil-only ones are little pranks.
+// `ms` overrides how long one plays (the art's own loop length otherwise).
 const TRICKS = [
     { state: 'idle-reading', sets: ['calm', 'normal', 'jahil'] },
     { state: 'idle-look', sets: ['calm', 'normal', 'jahil'] },
     { state: 'idle-yawn', sets: ['calm'] },
+    { state: 'bubbles', sets: ['calm', 'normal', 'jahil'] },
     { state: 'juggling', sets: ['normal', 'jahil'] },
     { state: 'sweeping', sets: ['normal', 'jahil'] },
     { state: 'carrying', sets: ['normal', 'jahil'] },
     { state: 'react-double-jump', sets: ['normal', 'jahil'] },
+    { state: 'yoyo', sets: ['normal', 'jahil'], ms: 8000 },
+    { state: 'fishing', sets: ['normal', 'jahil'] },
+    { state: 'dumbbell', sets: ['normal', 'jahil'] },
+    { state: 'dance', sets: ['normal', 'jahil'], ms: 6000 },
+    { state: 'folder', sets: ['jahil'] },
+    { state: 'hide-sign', sets: ['jahil'], ms: 10000 },
+    { state: 'potato', sets: ['jahil'], say: '🥔' },
     { id: 'scheming', state: 'ultrathink', sets: ['jahil'], say: 'Lagi mikirin cara ngerjain kamu...' },
     { id: 'not-my-bug', state: 'react-annoyed', sets: ['jahil'], say: 'Bug ini bukan salah aku 👀' },
     { id: 'maintenance', state: 'sleeping', sets: ['jahil'], say: 'Sedang maintenance 🚧', ms: 6000 },
@@ -55,18 +64,18 @@ const TRICKS = [
 ];
 
 const FOODS = {
-    cookie: { state: 'happy', say: 'Nyam nyam! Makasih 🍪', burst: 'hearts', label: 'Makan kue' },
+    cookie: { state: 'eat', say: 'Nyam nyam! Makasih 🍪', burst: 'hearts', label: 'Makan kue' },
     coffee: { state: 'ultrathink', say: 'KOPI!! Semangat banget!!! ☕', burst: 'sparks', label: 'Kebanyakan kopi', ms: 4000 },
-    spicy: { state: 'error', say: 'Pedeees! 🔥🔥', burst: 'fire', label: 'Kepedesan', ms: 3000 },
+    spicy: { state: 'fire', say: 'Pedeees! 🔥🔥', label: 'Kepedesan' },
 };
 
 const GREETINGS = ['Hai! 👋', 'Ada apa? 👀', 'Hehe', 'Lagi ngapain?', 'Semangat ngodingnya!'];
 
 // Break reminders, shown by the home pet while the user is at the laptop.
 const REMINDERS = {
-    eyes: { every: 30 * MINUTE, text: 'Istirahat mata: lihat jauh 20 detik 👀' },
-    water: { every: 60 * MINUTE, text: 'Minum air dulu yuk 💧' },
-    stretch: { every: 90 * MINUTE, text: 'Peregangan bentar: putar bahu, regangin tangan 🙆' },
+    eyes: { every: 30 * MINUTE, state: 'eye-rest', text: 'Lihat jauh 20 detik 👀' },
+    water: { every: 60 * MINUTE, state: 'drink', text: 'Minum air dulu yuk 💧' },
+    stretch: { every: 90 * MINUTE, state: 'stretch', text: 'Peregangan bentar yuk 🙆' },
 };
 const REMINDER_SHOWN_FOR = 3 * MINUTE;  // then it counts as seen
 const REMINDER_SNOOZE = 10 * MINUTE;
@@ -138,6 +147,9 @@ function randomBetween(min, max) {
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
+// A state from assets/svg/clawd-act-*.svg, or an older one if that file is missing.
+const art = (state, fallback) => (pet.has(state) ? state : fallback);
+
 // Laptop-wide alerts come from pet #1 only, so several pets don't chorus.
 const isHomePet = () => petNumber === 1;
 const mode = () => MODES[settings.mode] || MODES.teman;
@@ -202,7 +214,7 @@ function idleState() {
     const hour = new Date().getHours();
     if (userAway) return { state: 'sleeping', label: 'Nungguin kamu balik' };
     if (!claudeMode) {
-        if (!online) return { state: 'react-annoyed', label: 'Internet putus' };
+        if (!online) return { state: art('antenna', 'react-annoyed'), label: 'Internet putus' };
         if (busySamples >= 2) return { state: 'building', label: `Laptop kerja keras (CPU ${system.cpu}%)` };
         if (system.memory >= MEMORY_FULL) return { state: 'carrying', label: `RAM hampir penuh (${system.memory}%)` };
     }
@@ -227,12 +239,12 @@ function show(state, label) {
 function renderState() {
     if (dragging) return show('react-drag', 'Lagi diangkat');
     if (Date.now() < flashUntil) return undefined;
-    if (asking()) return show(hold);
-    if (reminder) return show('notification', reminder.text);
+    if (asking()) return show(art('raise-hand', hold), CLAUDE_LABELS.notification);
+    if (reminder) return show(art(REMINDERS[reminder.key].state, 'notification'), reminder.text);
     if (waitingForHighFive()) return show('react-right', 'Nunggu tos');
     const quiet = Date.now() - lastActiveAt;
     if (claudeMode && work && quiet < WORK_TIMEOUT) {
-        if (quiet >= LONG_WAIT && pet.has('idle-look')) return show('idle-look', 'Prosesnya lama, aku tungguin');
+        if (quiet >= LONG_WAIT) return show(art('wait-clock', 'idle-look'), 'Prosesnya lama, aku tungguin');
         return show(work);
     }
     work = null;
@@ -279,7 +291,9 @@ function effectFor({ event, tool, kind, notification }) {
         case 'UserPromptSubmit': return { work: 'thinking' };
         case 'PreToolUse': return { work: toolState(tool, kind) };
         case 'PostToolUse':
-            return kind === 'test' ? { flash: 'happy', label: 'Tes lulus!', say: 'Tes lulus ✅', burst: 'confetti' } : {};
+            return kind === 'test'
+                ? { flash: art('stamp', 'happy'), label: 'Tes lulus!', say: 'Tes lulus ✅', burst: 'confetti' }
+                : {};
         case 'SubagentStart': return { work: 'conducting' };
         case 'PreCompact': return { work: 'sweeping' };
         case 'PostToolUseFailure':
@@ -291,7 +305,7 @@ function effectFor({ event, tool, kind, notification }) {
             return ['permission_prompt', 'elicitation_dialog'].includes(notification)
                 ? { hold: 'notification' }
                 : { flash: 'notification', times: 2 };
-        case 'Stop': return { work: null, flash: 'happy' };
+        case 'Stop': return { work: null, flash: art('bell', 'happy'), label: CLAUDE_LABELS.happy };
         case 'StopFailure': return { work: null, flash: 'error', times: 3, label: 'Claude berhenti karena error' };
         case 'SessionEnd': return { work: null };
         default: return {};
@@ -456,6 +470,10 @@ window.clawd = {
         if (reminder || asking()) return;
         touch('dizzy');
         napUntil = 0;
+        if (pet.has('dizzy')) {
+            flash('dizzy', { label: 'Pusing', say: 'Pusiiing... 😵', ms: 4000 });
+            return;
+        }
         flash('react-annoyed', { label: 'Pusing', say: 'Pusiiing... 😵', burst: 'stars', ms: 3500 });
         fx.wobble(3500);
     },
@@ -478,15 +496,20 @@ window.clawd = {
         render();
         say('Wiii! 🎈', 1500);
     },
+    // Dropped near the taskbar it bounces; anywhere else it floats down on a parachute.
     drop({ nearBottom }) {
         dragging = false;
-        if (nearBottom) fx.bounce();
-        flash('react-double', {
-            label: 'Mendarat',
-            say: nearBottom ? 'Boing! 🛏️' : 'Di mana aku? 😳',
-            burst: 'dust',
-            ms: 2500,
-        });
+        if (nearBottom || !pet.has('parachute')) {
+            if (nearBottom) fx.bounce();
+            flash('react-double', {
+                label: 'Mendarat',
+                say: nearBottom ? 'Boing! 🛏️' : 'Di mana aku? 😳',
+                burst: 'dust',
+                ms: 2500,
+            });
+        } else {
+            flash('parachute', { label: 'Mendarat', say: 'Wuuush~ 🪂' });
+        }
         render();
     },
     menuContext: () => ({ reminder: Boolean(reminder), napping: napping() }),
@@ -587,7 +610,7 @@ function checkBattery() {
 
 window.addEventListener('offline', () => {
     online = false;
-    if (isHomePet()) flash('error', { label: 'Internet putus' });
+    if (isHomePet()) flash(art('antenna', 'error'), { label: 'Internet putus', say: 'Sinyal ilang... 📡' });
 });
 window.addEventListener('online', () => {
     online = true;

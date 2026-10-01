@@ -23,8 +23,9 @@ function getSvgDuration(filePath) {
   return cycles.length ? Math.max(1000, ...cycles) : 2000;
 }
 
-// "clawd-idle-reading.gif" -> "idle-reading", "clawd-working-ultrathink.svg" -> "ultrathink".
-const stateName = (file) => file.replace(/\.(gif|svg)$/, '').replace(/^clawd-/, '').replace(/^working-/, '');
+// "clawd-idle-reading.gif" -> "idle-reading", "clawd-working-ultrathink.svg" -> "ultrathink",
+// "clawd-act-drink.svg" -> "drink" (act-: animations drawn for this fork).
+const stateName = (file) => file.replace(/\.(gif|svg)$/, '').replace(/^clawd-/, '').replace(/^(working|act)-/, '');
 
 // GIFs first; an SVG only adds states that have no GIF.
 function listStates() {
