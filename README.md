@@ -39,7 +39,8 @@ clawd-desktop
 - **Transparent & frameless** — only the character is visible, no window chrome
 - **Roams freely** — wanders your screen, bounces off edges
 - **Rich animations** — idle, walking, building, typing, thinking, sleeping, error, happy, juggling, and more
-- **System tray control** — Show / Hide / Quit from the tray icon
+- **System tray control** — Show / Hide / Size / Mode / Reminders / Quit from the tray icon
+- **Interactive** — click, pet, drag and feed it; break reminders; four liveliness modes
 - **Auto-start with Windows** — always there when you open your PC
 - **Lightweight** — built on Electron with vanilla JS, no heavy framework
 
@@ -93,6 +94,44 @@ Useful events: `SessionStart` (use `"timeout": 15`; it starts Clawd if needed),
 
 In both modes Clawd follows the clock when nothing is happening: sleeps after
 midnight, takes a lunch break at noon, reads in the evening and chimes on the hour.
+
+A shell command that looks like a test run (`test`, `jest`, `vitest`, `pytest`,
+...) ends with confetti when it passes and a "failed" sign when it exits
+non-zero. When Claude has been quiet for 2 minutes mid-task, Clawd looks around
+and waits.
+
+### Playing with Clawd
+
+- **Click** — it waves toward the side you clicked. **Double-click** — a jump.
+  **Five quick clicks** — it gets dizzy and wobbles.
+- **Pet it** — move the cursor back and forth over it: hearts.
+- **Hover** — it looks at you (at most every 30 seconds).
+- **Drag** — it dangles from the cursor; dropped near the taskbar it bounces.
+- **Right-click** — feed it (cookie, coffee, spicy food), ask for a high five,
+  send it to nap or wake it, pick the mode and the reminders, or hide it.
+
+Speech bubbles and small particle effects (hearts, stars, confetti, dust, fire)
+go with the reactions. Clawd remembers the tricks it played recently (so it
+doesn't repeat them), what you fed it most, and when you last played with it.
+
+### Mode
+
+Set from the tray or the right-click menu:
+
+| Mode | Behavior |
+|------|----------|
+| Kalem | Rare, quiet tricks (reading, looking around, yawning); minimal effects |
+| Teman kerja | Default: tricks every 4–8 minutes, Claude status, reminders |
+| Jahil | Tricks every 1.5–4 minutes, including little pranks |
+| Fokus | No tricks, effects or hourly chime; Claude status and reminders only |
+
+### Break reminders
+
+Pet #1 reminds you to rest your eyes (every 30 minutes), drink water (60) and
+stretch (90) while you are at the laptop; being away for 5 minutes counts as an
+eye and stretch break. A reminder stays up for 3 minutes with nothing else
+moving over it. Click Clawd to mark it done, or right-click → snooze 10 minutes.
+Each reminder can be turned off under Reminders / Pengingat.
 
 ### Command-line control
 

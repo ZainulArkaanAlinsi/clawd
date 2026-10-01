@@ -1,13 +1,5 @@
-const rawGifs = window.electronAPI.getGifs();
-
-// "clawd-idle-reading.gif" -> state "idle-reading"
-const STATES = {};
-const DURATIONS = {};
-rawGifs.forEach(({ name, duration }) => {
-    const key = name.replace('.gif', '').replace(/^clawd-/, '');
-    STATES[key] = `../assets/gif/${name}`;
-    DURATIONS[key] = duration;
-});
+// state name -> { src, duration } (GIFs, plus SVG-only states).
+const STATES = window.electronAPI.getStates();
 
 const petImg = document.getElementById('pet-img');
 
@@ -16,21 +8,21 @@ let playCount = 0;
 
 window.pet = {
     has: (state) => state in STATES,
-    duration: (state) => DURATIONS[state] || 1000,
+    duration: (state) => (STATES[state] && STATES[state].duration) || 1000,
     current: () => currentState,
 
-    // Loop a state. Asking for the state already shown is a no-op, so the GIF
-    // keeps running instead of restarting.
+    // Loop a state. Asking for the state already shown is a no-op, so the
+    // animation keeps running instead of restarting.
     loop(state) {
         if (!STATES[state] || state === currentState) return;
         currentState = state;
-        petImg.src = STATES[state];
+        petImg.src = STATES[state].src;
     },
 
     // Play a state from its first frame (the query string forces a restart).
     once(state) {
         if (!STATES[state]) return;
         currentState = state;
-        petImg.src = `${STATES[state]}?play=${++playCount}`;
+        petImg.src = `${STATES[state].src}?play=${++playCount}`;
     },
 };

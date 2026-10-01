@@ -13,23 +13,47 @@ function getGifDuration(filePath) {
   return Math.max(delay * 10, 1000);
 }
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  getGifs: () => {
+// SVG animations are CSS keyframes; one "play" is the longest cycle up to 6s
+// (longer cycles are slow background loops, not the main motion).
+function getSvgDuration(filePath) {
+  const css = fs.readFileSync(filePath, 'utf8');
+  const cycles = [...css.matchAll(/animation(?:-duration)?\s*:[^;}]*?([\d.]+)(m?s)\b/g)]
+    .map(([, n, unit]) => Number(n) * (unit === 's' ? 1000 : 1))
+    .filter((ms) => ms > 0 && ms <= 6000);
+  return cycles.length ? Math.max(1000, ...cycles) : 2000;
+}
+
+// "clawd-idle-reading.gif" -> "idle-reading", "clawd-working-ultrathink.svg" -> "ultrathink".
+const stateName = (file) => file.replace(/\.(gif|svg)$/, '').replace(/^clawd-/, '').replace(/^working-/, '');
+
+// GIFs first; an SVG only adds states that have no GIF.
+function listStates() {
+  const states = {};
+  for (const [dir, ext, duration] of [['gif', '.gif', getGifDuration], ['svg', '.svg', getSvgDuration]]) {
     try {
-      const gifDir = path.join(__dirname, 'assets', 'gif');
-      return fs.readdirSync(gifDir)
-        .filter(f => f.endsWith('.gif'))
-        .map(f => ({
-          name: f,
-          duration: getGifDuration(path.join(gifDir, f))
-        }));
+      const folder = path.join(__dirname, 'assets', dir);
+      for (const f of fs.readdirSync(folder).filter((name) => name.endsWith(ext))) {
+        const name = stateName(f);
+        if (!states[name]) states[name] = { src: `../assets/${dir}/${f}`, duration: duration(path.join(folder, f)) };
+      }
     } catch {
-      return [];
+      // missing folder: no states from it
     }
-  },
+  }
+  return states;
+}
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  getStates: listStates,
   onClaudeEvent: (callback) => ipcRenderer.on('claude-event', (_event, ev) => callback(ev)),
   onSystemEvent: (callback) => ipcRenderer.on('system-event', (_event, message) => callback(message)),
   getMeta: () => ipcRenderer.invoke('get-pet-meta'),
   onMeta: (callback) => ipcRenderer.on('pet-meta', (_event, meta) => callback(meta)),
   reportStatus: (status) => ipcRenderer.send('pet-status', status),
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  onSettings: (callback) => ipcRenderer.on('pet-settings', (_event, settings) => callback(settings)),
+  onAction: (callback) => ipcRenderer.on('pet-action', (_event, action) => callback(action)),
+  showMenu: (context) => ipcRenderer.send('show-menu', context),
+  dragStart: () => ipcRenderer.send('drag-start'),
+  dragEnd: () => ipcRenderer.invoke('drag-end'),
 });
