@@ -19,7 +19,26 @@ html, body {
 }
 
 #pet-container img {
-    width: 128px;
-    height: 128px;
+    width: 100%;
+    height: 100%;
     image-rendering: pixelated;
+}
+
+/* Session number, shown only when several pets are on screen. */
+#badge {
+    display: none;
+    position: absolute;
+    top: 36%;
+    right: 10%;
+    min-width: 18px;
+    padding: 1px 4px;
+    border-radius: 9px;
+    background: #d97757;
+    color: #fff;
+    font: bold 12px/16px Consolas, monospace;
+    text-align: center;
+}
+
+#badge.show {
+    display: block;
 }
