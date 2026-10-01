@@ -130,6 +130,7 @@ let napUntil = 0;
 let highFiveUntil = 0;
 let highFiveTimer = null;
 let reminder = null;     // { key, text, until } while a reminder is up
+let game = null;         // { state, prompt } while a mini-game runs (renderer/games.js)
 const reminderDue = {};
 for (const [key, { every }] of Object.entries(REMINDERS)) reminderDue[key] = Date.now() + every;
 
@@ -156,13 +157,16 @@ const mode = () => MODES[settings.mode] || MODES.teman;
 const napping = () => Date.now() < napUntil;
 const waitingForHighFive = () => Date.now() < highFiveUntil;
 const asking = () => claudeMode && hold;
+// Something already has Clawd's attention: no hover or wave reaction now.
+const busy = () => reminder || asking() || game || work || napping() || waitingForHighFive()
+    || Date.now() < flashUntil;
 
 // --- memory (kept across restarts, shared by all pets) -------------------------
 
 const MEMORY_KEY = 'clawd-memory';
 
 function loadMemory() {
-    const empty = { recent: [], food: {}, lastTouch: null };
+    const empty = { recent: [], food: {}, lastTouch: null, games: {} };
     try {
         return { ...empty, ...JSON.parse(localStorage.getItem(MEMORY_KEY)) };
     } catch {
@@ -197,6 +201,7 @@ function burst(kind) {
 function stickyText() {
     if (asking()) return 'Butuh kamu! 🙋';
     if (reminder) return reminder.text;
+    if (game) return game.prompt;
     if (waitingForHighFive()) return 'Tos! Klik aku ✋';
     return null;
 }
@@ -241,6 +246,7 @@ function renderState() {
     if (Date.now() < flashUntil) return undefined;
     if (asking()) return show(art('raise-hand', hold), CLAUDE_LABELS.notification);
     if (reminder) return show(art(REMINDERS[reminder.key].state, 'notification'), reminder.text);
+    if (game) return show(game.state, 'Lagi main');
     if (waitingForHighFive()) return show('react-right', 'Nunggu tos');
     const quiet = Date.now() - lastActiveAt;
     if (claudeMode && work && quiet < WORK_TIMEOUT) {
@@ -483,9 +489,39 @@ window.clawd = {
         flash(napping() ? 'sleeping' : 'happy', { label: 'Dielus', say: 'Hehe, enak 😊', burst: 'hearts', ms: 2500 });
     },
     hover() {
-        const busy = reminder || asking() || work || napping() || waitingForHighFive() || Date.now() < flashUntil;
-        if (busy || settings.mode === 'fokus') return;
+        if (busy() || settings.mode === 'fokus') return;
         flash('idle-follow', { label: 'Merhatiin kamu', ms: 2500 });
+    },
+    // The cursor went away after a while near Clawd (renderer/input.js).
+    wave() {
+        if (busy() || settings.mode === 'fokus') return;
+        flash(art('wave', 'react-right'), { label: 'Dadah', say: 'Dadah! 👋', ms: 2500 });
+    },
+    // The cursor kept circling Clawd.
+    chased() {
+        if (reminder || asking() || game || settings.mode === 'fokus') return;
+        touch('chased');
+        flash(art('dizzy', 'react-annoyed'), { label: 'Capek ngejar', say: 'Capek ngejar kamu... 😵', ms: 3500 });
+    },
+
+    // For renderer/games.js: what Clawd shows while a game runs (null ends it),
+    // a one-off reaction, and that game's saved stats (`change` updates them).
+    setGame(next) {
+        game = next;
+        if (game) {
+            napUntil = 0;
+            fx.clear();
+        }
+        render();
+    },
+    react: (state, options) => flash(state, options),
+    stats(name, change) {
+        const memory = remember((m) => {
+            m.games = m.games || {};
+            m.games[name] = m.games[name] || {};
+            if (change) change(m.games[name]);
+        });
+        return memory.games[name];
     },
     dragStart() {
         clearTimeout(flashTimer);
@@ -512,7 +548,7 @@ window.clawd = {
         }
         render();
     },
-    menuContext: () => ({ reminder: Boolean(reminder), napping: napping() }),
+    menuContext: () => ({ reminder: Boolean(reminder), napping: napping(), playing: Boolean(game) }),
 };
 
 function onAction(action) {
@@ -525,6 +561,10 @@ function onAction(action) {
         case 'wake': return wakeUp();
         case 'reminder-done': return dismissReminder();
         case 'reminder-snooze': return snoozeReminder();
+        case 'game':
+            if (reminder || asking()) return say('Nanti dulu ya, ada yang penting 🙏', 2500);
+            return games.start(action.name);
+        case 'game-stop': return games.stop();
         default: return undefined;
     }
 }
@@ -541,7 +581,7 @@ function checkReminders() {
         render();
         return;
     }
-    if (userAway || dragging || asking()) return;
+    if (userAway || dragging || asking() || game) return;
     const key = Object.keys(REMINDERS).find((k) => settings.reminders[k] && reminderDue[k] <= now);
     if (!key) return;
     reminder = { key, text: REMINDERS[key].text, until: now + REMINDER_SHOWN_FOR };
@@ -656,7 +696,7 @@ function onTick() {
     checkBattery();
     checkReminders();
 
-    const free = !work && !hold && !reminder && !dragging && !napping() && !waitingForHighFive()
+    const free = !work && !hold && !reminder && !game && !dragging && !napping() && !waitingForHighFive()
         && Date.now() >= flashUntil;
     if (free && Date.now() >= nextTrickAt) {
         scheduleTrick();

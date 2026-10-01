@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   onSettings: (callback) => ipcRenderer.on('pet-settings', (_event, settings) => callback(settings)),
   onAction: (callback) => ipcRenderer.on('pet-action', (_event, action) => callback(action)),
+  onCursor: (callback) => ipcRenderer.on('cursor', (_event, offset) => callback(offset)),
   showMenu: (context) => ipcRenderer.send('show-menu', context),
   dragStart: () => ipcRenderer.send('drag-start'),
   dragEnd: () => ipcRenderer.invoke('drag-end'),

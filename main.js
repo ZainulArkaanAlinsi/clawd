@@ -16,6 +16,8 @@ const SWITCHES = ['--show', '--hide', '--quit', '--startup-on', '--startup-off',
 const DRAG_FRAME = 16;           // ms between window moves while dragging
 const DRAG_MAX = 60 * 1000;      // stop following the cursor if the mouse-up never arrives
 const NEAR_TASKBAR = 80;         // px: a drop this close to the bottom bounces
+const CURSOR_EVERY = 100;        // ms between cursor checks
+const CURSOR_RANGE = 700;        // px: farther cursor positions aren't sent to the pets
 
 // How lively the pets are (renderer/behavior.js MODES) and the break reminders.
 const MODES = [['kalem', 'Kalem'], ['teman', 'Teman kerja'], ['jahil', 'Jahil'], ['fokus', 'Fokus']];
@@ -365,6 +367,29 @@ function watchSystem() {
   setInterval(sampleSystem, SYSTEM_SAMPLE_EVERY);
 }
 
+// Where the cursor is relative to each pet (its body, not the window corner), so
+// it can notice the cursor coming, going and circling outside its own window.
+// Sent only while the cursor is within CURSOR_RANGE, plus once when it leaves.
+function watchCursor() {
+  let last = null;
+  setInterval(() => {
+    if (hiddenByUser) return;
+    const p = screen.getCursorScreenPoint();
+    if (last && last.x === p.x && last.y === p.y) return;
+    last = p;
+    const size = petSize();
+    for (const pet of pets) {
+      if (!pet.ready || pet.drag || pet.win.isDestroyed()) continue;
+      const [x, y] = pet.win.getPosition();
+      const dx = Math.round(p.x - (x + size / 2));
+      const dy = Math.round(p.y - (y + size * 0.7));
+      const near = Math.hypot(dx, dy) <= CURSOR_RANGE;
+      if (near || pet.cursorNear) pet.win.webContents.send('cursor', { dx, dy });
+      pet.cursorNear = near;
+    }
+  }, CURSOR_EVERY);
+}
+
 // --- tray & settings -------------------------------------------------------------
 
 function updateTrayTooltip() {
@@ -475,6 +500,16 @@ function showPetMenu(pet, context) {
       ],
     },
     { label: 'Ajak tos', click: act({ type: 'high-five' }) },
+    {
+      label: 'Main',
+      submenu: context.playing
+        ? [{ label: 'Berhenti main', click: act({ type: 'game-stop' }) }]
+        : [
+          { label: 'Suit (batu-gunting-kertas)', click: act({ type: 'game', name: 'suit' }) },
+          { label: 'Tebak tangan', click: act({ type: 'game', name: 'tebak' }) },
+          { label: 'Tepuk serangga', click: act({ type: 'game', name: 'serangga' }) },
+        ],
+    },
     context.napping
       ? { label: 'Bangunin', click: act({ type: 'wake' }) }
       : { label: 'Suruh istirahat', click: act({ type: 'nap' }) },
@@ -613,7 +648,9 @@ ipcMain.handle('get-settings', () => petSettings());
 
 ipcMain.on('show-menu', (event, context) => {
   const pet = petFor(event.sender);
-  if (pet) showPetMenu(pet, { reminder: Boolean(context && context.reminder), napping: Boolean(context && context.napping) });
+  if (!pet) return;
+  const flag = (key) => Boolean(context && context[key]);
+  showPetMenu(pet, { reminder: flag('reminder'), napping: flag('napping'), playing: flag('playing') });
 });
 
 ipcMain.on('drag-start', (event) => {
@@ -680,6 +717,7 @@ if (!app.requestSingleInstanceLock()) {
     applyLoginItem();
     setInterval(reapClosedSessions, REAP_EVERY);
     watchSystem();
+    watchCursor();
 
     screen.on('display-removed', ensureOnScreen);
     screen.on('display-metrics-changed', ensureOnScreen);
