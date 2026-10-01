@@ -28,5 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
   onClaudeEvent: (callback) => ipcRenderer.on('claude-event', (_event, ev) => callback(ev)),
+  onSystemEvent: (callback) => ipcRenderer.on('system-event', (_event, message) => callback(message)),
+  getMeta: () => ipcRenderer.invoke('get-pet-meta'),
+  onMeta: (callback) => ipcRenderer.on('pet-meta', (_event, meta) => callback(meta)),
   reportStatus: (status) => ipcRenderer.send('pet-status', status),
 });

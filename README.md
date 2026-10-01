@@ -63,8 +63,8 @@ npm start
 Clawd stays on screen and reacts to Claude Code activity through local
 [hooks](https://code.claude.com/docs/en/hooks). The app listens on
 `127.0.0.1:47321` (override with `CLAWD_PORT`); `hooks/clawd-hook.js` forwards
-only the event name, tool name and a coarse shell-command kind — never prompts,
-file contents or command text.
+only the event name, tool name, a coarse shell-command kind, the project folder
+name and Claude's process id — never prompts, file contents or command text.
 
 1. Copy `hooks/clawd-hook.js` somewhere stable, e.g. `~/.claude/hooks/`.
 2. Add a command hook for each event in `~/.claude/settings.json`:
@@ -77,23 +77,36 @@ file contents or command text.
 }
 ```
 
-Useful events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
-`PostToolUseFailure`, `PermissionRequest`, `Notification`, `SubagentStart`,
-`PreCompact`, `Stop`, `StopFailure`, `SessionEnd`.
+Useful events: `SessionStart` (use `"timeout": 15`; it starts Clawd if needed),
+`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`,
+`PermissionRequest`, `Notification`, `SubagentStart`, `PreCompact`, `Stop`,
+`StopFailure`, `SessionEnd`.
 
-When Claude is quiet, Clawd follows the clock: naps after midnight, takes a lunch
-break at noon, reads in the evening and chimes on the hour.
+### Two modes
+
+- **Claude mode** — every running Claude Code window gets its own pet (numbered
+  when there are several). A pet disappears when its Claude Code process exits.
+- **Laptop mode** — with no Claude Code session the pet watches the laptop: it
+  naps when you are away for 5 minutes and greets you back, reacts to resume and
+  unlock, charger plugged/unplugged, low battery, high CPU or RAM, and losing
+  the network.
+
+In both modes Clawd follows the clock when nothing is happening: sleeps after
+midnight, takes a lunch break at noon, reads in the evening and chimes on the hour.
 
 ### Command-line control
 
 `scripts/clawd.cmd` (put it on your `PATH`) controls the installed app:
 
 ```
-clawd [show]          start Clawd or bring it back
-clawd hide            hide Clawd (stays in the tray)
-clawd quit            close Clawd
-clawd status          what Clawd is doing (JSON)
-clawd startup on|off  start with Windows
+clawd [show]           start Clawd or bring it back
+clawd hide             hide Clawd (stays in the tray)
+clawd quit             close Clawd (it comes back with the next Claude Code session)
+clawd off              close Clawd and stop it coming back with Claude Code
+clawd on               allow that again and start Clawd
+clawd size SIZE        small, medium, large or pixels (64-512)
+clawd status           what Clawd is doing (JSON)
+clawd startup on|off   start with Windows
 ```
 
 ## Build Installer
